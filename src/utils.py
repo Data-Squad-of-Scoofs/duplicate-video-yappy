@@ -21,3 +21,12 @@ def download_file_from_s3(bucket_url, object_key, download_path):
 
 def mp4(name):
     return name+'.mp4'
+
+
+def compute_similarities(q_feat, d_feat, topk_cs=True):
+    sim = q_feat @ d_feat.T
+    sim = sim.max(dim=1)[0]
+    if topk_cs:
+        sim = sim.sort()[0][-3:]
+    sim = sim.mean().item()
+    return sim
