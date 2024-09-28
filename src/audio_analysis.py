@@ -28,18 +28,19 @@ def get_audio_features(model, features=None, video_folder=None, video_paths=None
         video = VideoFileClip(path)
         audio = video.audio
 
+        if audio is None:
+            continue
+
         audio_data = audio.to_soundarray(fps=48000)
         audio_data = np.mean(audio_data, axis=1)  # Преобразуем в моно, если требуется
         # audio_data = audio_data[:, 0]
-
+        
         # audio_data, _ = librosa.load(audio_data, sr=48000) # sample rate should be 48000
         audio_data = audio_data.reshape(1, -1) # Make it (1,T) or (N,T)
 
         with torch.no_grad():
             audio_embed = model.get_audio_embedding_from_data(x = audio_data, use_tensor=False)
 
-        all_features[video_id] = audio_embed.detach().cpu()
+        all_features[video_id] = torch.tensor(audio_embed)
 
-    normed_features = {vid: model.normalize_features(feats.cuda()) for vid, feats in all_features.items()}
-
-    return normed_features
+    return all_features

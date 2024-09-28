@@ -3,23 +3,6 @@ from tqdm import tqdm
 import os
 from .utils import compute_similarities
 
-def calculate_similarities(video_id=None, second_video_id=None, all_features=None, model=None):
-    if video_id is not None and second_video_id is not None:
-        return compute_similarities(all_features[video_id], all_features[second_video_id])
-    
-    elif video_id is not None and all_features is not None:
-        first_feat = all_features[video_id]
-        similarities = {second_video_id: compute_similarities(first_feat, all_features[second_video_id]) 
-                        for second_video_id in all_features if second_video_id != video_id}
-        return similarities
-    
-    elif all_features is not None:
-        similarities = {video_id: compute_similarities(video_id, all_features=all_features, model=model) 
-                        for video_id in all_features}
-        return similarities
-
-    return None  # В случае, если не указаны необходимые переменные
-
 
 def get_video_features(preprocess, model, features=None, video_folder=None, video_paths=None):
     if video_folder is not None:

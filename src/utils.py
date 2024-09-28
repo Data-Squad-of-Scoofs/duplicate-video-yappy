@@ -30,3 +30,20 @@ def compute_similarities(q_feat, d_feat, topk_cs=True):
         sim = sim.sort()[0][-3:]
     sim = sim.mean().item()
     return sim
+
+def calculate_similarities(video_id=None, second_video_id=None, all_features=None):
+    if video_id is not None and second_video_id is not None:
+        return compute_similarities(all_features[video_id], all_features[second_video_id])
+    
+    elif video_id is not None and all_features is not None:
+        first_feat = all_features[video_id]
+        similarities = {second_video_id: compute_similarities(first_feat, all_features[second_video_id]) 
+                        for second_video_id in all_features if second_video_id != video_id}
+        return similarities
+    
+    elif all_features is not None:
+        similarities = {video_id: compute_similarities(video_id, all_features=all_features) 
+                        for video_id in all_features}
+        return similarities
+
+    return None  # В случае, если не указаны необходимые переменные
