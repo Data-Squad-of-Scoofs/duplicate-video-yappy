@@ -10,3 +10,4 @@ audios/
 pickled_data/*
 !pickled_data/audio_similarities.pkl
 !pickled_data/video_similarities.pkl
+audio_similarity/
