@@ -61,7 +61,7 @@ def get_video_embeddings():
 
 
 @st.cache_data
-def get_audio_embeddings(most_similar_id):
+def get_audio_embedding(most_similar_id):
     conn = sqlite3.connect('video_embeddings.db')
     c = conn.cursor()
     c.execute("SELECT audio_embeddings FROM your_table WHERE uuid=?", (most_similar_id,))
