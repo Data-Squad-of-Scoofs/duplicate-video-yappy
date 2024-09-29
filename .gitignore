@@ -8,6 +8,8 @@ ausil/
 trash/
 audios/
 pickled_data/*
-!pickled_data/audio_similarities.pkl
+!pickled_data/audio_features_2500_default_audio_model.pkl
 !pickled_data/video_similarities.pkl
+!pickled_data/grey_features_2500.pkl
+!pickled_data/audio_features_2500_default_audio_model.pkl
 audio_similarity/
