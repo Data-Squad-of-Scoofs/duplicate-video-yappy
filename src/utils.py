@@ -1,7 +1,8 @@
 import os
 import requests
 import numpy as np
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
 
 def download_file(object_url, download_path):
     directory = os.path.dirname(download_path)
@@ -31,33 +32,30 @@ def compute_similarities(q_feat, d_feat, topk_cs=True):
     sim = sim.mean().item()
     return sim
 
-
-
 def calculate_similarities(video_id=None, second_video_id=None, all_features=None):
     if video_id is not None and second_video_id is not None:
         return compute_similarities(all_features[video_id], all_features[second_video_id])
     
     elif video_id is not None and all_features is not None:
         first_feat = all_features[video_id]
-        similarities = {second_video_id: compute_similarities(first_feat, all_features[second_video_id]) 
-                        for second_video_id in all_features if second_video_id != video_id}
+        similarities = {}
+        for second_video_id in all_features:
+            if second_video_id != video_id:
+                similarities[second_video_id] = compute_similarities(first_feat, all_features[second_video_id])
         return similarities
     
     elif all_features is not None:
-        similarities = {video_id: calculate_similarities(video_id, all_features=all_features) 
-                        for video_id in all_features}
+        similarities = {}
+        for video_id in tqdm(all_features, desc="Calculating similarities for all videos", ncols=70):
+            similarities[video_id] = calculate_similarities(video_id, all_features=all_features)
         return similarities
 
     return None  # В случае, если не указаны необходимые переменные
 
 def compute_rhythm_similarities(q_feat, d_feat):
     min_length = min(len(q_feat), len(d_feat))
-
     rhythm_similarity = (np.corrcoef(q_feat[:min_length], d_feat[:min_length])[0, 1] + 1) / 2
-
     return rhythm_similarity
-
-from tqdm import tqdm
 
 def calculate_rhythm_similarities(video_id=None, second_video_id=None, all_features=None):
     if video_id is not None and second_video_id is not None:
@@ -66,15 +64,20 @@ def calculate_rhythm_similarities(video_id=None, second_video_id=None, all_featu
     elif video_id is not None and all_features is not None:
         first_feat = all_features[video_id]
         similarities = {}
-        for second_video_id in tqdm(all_features, desc='Calculating similarities', ncols=70):
+        for second_video_id in all_features:
             if second_video_id != video_id:
                 similarities[second_video_id] = compute_rhythm_similarities(first_feat, all_features[second_video_id])
         return similarities
     
     elif all_features is not None:
         similarities = {}
-        for video_id in tqdm(all_features, desc='Calculating similarities for all videos', ncols=70):
-            similarities[video_id] = calculate_rhythm_similarities(video_id, all_features=all_features)
+        
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(calculate_rhythm_similarities, video_id, all_features=all_features): video_id for video_id in all_features}
+            for future in tqdm(as_completed(futures), total=len(futures), desc='Calculating similarities for all videos', ncols=70):
+                video_id = futures[future]
+                similarities[video_id] = future.result()
+        
         return similarities
 
-    return None  # В случае, если не указаны необходимые переменные
+    return None 

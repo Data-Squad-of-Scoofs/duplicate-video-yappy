@@ -7,4 +7,6 @@ train_data_yappy/train_dataset/
 ausil/
 trash/
 audios/
-pickled_data/
+pickled_data/*
+!pickled_data/audio_similarities.pkl
+!pickled_data/video_similarities.pkl

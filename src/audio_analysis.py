@@ -49,7 +49,7 @@ def get_audio_features(model, features=None, video_folder=None, video_paths=None
     return all_features
 
 
-def get_audio_features_rhythm(features=None, video_folder=None, video_paths=None):
+def get_audio_features_tempo(features=None, video_folder=None, video_paths=None):
     if video_folder is not None:
         video_paths = [os.path.join(video_folder, name) for name in os.listdir(video_folder)]
     elif video_paths is None:
@@ -74,21 +74,35 @@ def get_audio_features_rhythm(features=None, video_folder=None, video_paths=None
 
         if audio is None:
             continue
-        try:
-            fps = 7000
+        
+        audio_data = audio.to_soundarray(fps=44000)
+        audio_data = np.mean(audio_data, axis=1)
 
-            audio_data = audio.to_soundarray(fps=fps, quantize=True, buffersize=10000)
-            audio_data = np.mean(audio_data, axis=1)
-
-            min_length = len(audio_data)
-            original_onset_vector = np.zeros(min_length)
-            original_onsets = librosa.onset.onset_detect(y=audio_data, sr=fps, units='time')
-            original_onsets = np.array(original_onsets) * fps
-            original_onsets = original_onsets[original_onsets < min_length]
-            original_onset_vector[original_onsets.astype(int)] = 1
-
-            all_features[video_id] = torch.tensor(original_onset_vector)
-        except Exception as e:
-            print(f'Ошибка вылезла в видосе {video_id}: {e}')
+        sr = 44000
+    
+        tempo, _ = librosa.beat.beat_track(y=audio_data, sr=sr)
+        # print(f'Tempo: {tempo} BPM')
+        
+        all_features[video_id] = torch.tensor(tempo)
 
     return all_features
+
+
+
+
+# try:
+#     fps = 7000
+
+#     audio_data = audio.to_soundarray(fps=fps, quantize=True, buffersize=10000)
+#     audio_data = np.mean(audio_data, axis=1)
+
+#     min_length = len(audio_data)
+#     original_onset_vector = np.zeros(min_length)
+#     original_onsets = librosa.onset.onset_detect(y=audio_data, sr=fps, units='time')
+#     original_onsets = np.array(original_onsets) * fps
+#     original_onsets = original_onsets[original_onsets < min_length]
+#     original_onset_vector[original_onsets.astype(int)] = 1
+
+#     all_features[video_id] = torch.tensor(original_onset_vector)
+# except Exception as e:
+#     print(f'Ошибка вылезла в видосе {video_id}: {e}')
