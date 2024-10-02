@@ -11,8 +11,10 @@ originals = df[df['is_duplicate'] == False]
 
 dataset_folder = 'train_data_yappy/train_dataset'
 
+
 def find_copies(uuid):
     return df[df['duplicate_for'] == uuid]
+
 
 def download_file(url, filepath):
     try:
