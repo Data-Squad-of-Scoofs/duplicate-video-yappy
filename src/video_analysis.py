@@ -1,5 +1,5 @@
 import torch
-from .preprocess import Preprocess
+from .video_preprocess import Preprocess
 
 
 def load_and_preprocess_video(video_path,

@@ -11,8 +11,10 @@ originals = df[df['is_duplicate'] == False]
 
 dataset_folder = 'train_data_yappy/train_dataset'
 
+
 def find_copies(uuid):
     return df[df['duplicate_for'] == uuid]
+
 
 def download_file(url, filepath):
     try:
@@ -25,13 +27,14 @@ def download_file(url, filepath):
     except Exception as e:
         print(f"Ошибка при скачивании {url}: {e}")
 
+
 # Словарь для хранения оригиналов и их копий
 originals_dict = {}
 
 for index, row in originals.iterrows():
     original_uuid = row['uuid']
     copies = find_copies(original_uuid)
-    
+
     if not copies.empty:
         originals_dict[original_uuid] = copies['uuid'].tolist()
 
@@ -41,7 +44,7 @@ missing_files_dict = defaultdict(list)
 for original, copies in originals_dict.items():
     original_file = f"{original}.mp4"
     original_path = os.path.join(dataset_folder, original_file)
-    
+
     original_link = df[df['uuid'] == original]['link'].values[0]
     if not os.path.exists(original_path):
         missing_files_dict[original].append((original, original_link))
@@ -49,7 +52,7 @@ for original, copies in originals_dict.items():
     for copy_uuid in copies:
         copy_file = f"{copy_uuid}.mp4"
         copy_path = os.path.join(dataset_folder, copy_file)
-        
+
         if not os.path.exists(copy_path):
             copy_link = df[df['uuid'] == copy_uuid]['link'].values[0]
             missing_files_dict[original].append((copy_uuid, copy_link))
@@ -58,7 +61,8 @@ for original, copies in originals_dict.items():
 for i, (original, links) in enumerate(missing_files_dict.items()):
     if i >= 5:
         break
-    print(f"Оригинал: {original}, Ссылка на оригинал: {df[df['uuid'] == original]['link'].values[0]}")
+    print(
+        f"Оригинал: {original}, Ссылка на оригинал: {df[df['uuid'] == original]['link'].values[0]}")
     for copy_uuid, link in links:
         print(f"  Недостающая копия UUID: {copy_uuid}, Ссылка: {link}")
     print("\n")
@@ -69,7 +73,7 @@ for original, links in tqdm(missing_files_dict.items(), desc="Скачивани
     for copy_uuid, link in links:
         filename = os.path.basename(link)
         filepath = os.path.join(dataset_folder, filename)
-        
+
         download_file(link, filepath)
         download_count += 1
 
