@@ -3,7 +3,6 @@ import pandas as pd
 from collections import defaultdict
 import requests
 from tqdm import tqdm
-import io
 
 numb_of_download = 500
 
@@ -17,19 +16,16 @@ def find_copies(uuid):
     return df[df['duplicate_for'] == uuid]
 
 
-def download_file(url):
+def download_file(url, filepath):
     try:
         response = requests.get(url, stream=True)
         response.raise_for_status()
-        # BytesIO для хранения видео в ОЗУ
-        file_in_memory = io.BytesIO()
-        for chunk in response.iter_content(chunk_size=8192):
-            file_in_memory.write(chunk)
-        file_in_memory.seek(0)
-        return file_in_memory
+        with open(filepath, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+        # print(f"Скачано: {filepath}")
     except Exception as e:
         print(f"Ошибка при скачивании {url}: {e}")
-        return None
 
 
 # Словарь для хранения оригиналов и их копий
@@ -65,15 +61,15 @@ for original, copies in originals_dict.items():
 for i, (original, links) in enumerate(missing_files_dict.items()):
     if i >= 5:
         break
-    print(f"Оригинал: {original}, Ссылка на оригинал: {df[df['uuid'] == original]['link'].values[0]}")
+    print(
+        f"Оригинал: {original}, Ссылка на оригинал: {df[df['uuid'] == original]['link'].values[0]}")
     for copy_uuid, link in links:
         print(f"  Недостающая копия UUID: {copy_uuid}, Ссылка: {link}")
     print("\n")
 
 download_count = 0
 
-for original, links in tqdm(missing_files_dict.items(), desc="Скачивание недостающих файлов",
-                            total=min(len(missing_files_dict), numb_of_download)):
+for original, links in tqdm(missing_files_dict.items(), desc="Скачивание недостающих файлов", total=min(len(missing_files_dict), numb_of_download)):
     for copy_uuid, link in links:
         filename = os.path.basename(link)
         filepath = os.path.join(dataset_folder, filename)
