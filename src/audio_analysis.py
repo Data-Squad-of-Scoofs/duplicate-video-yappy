@@ -11,6 +11,9 @@ def load_and_preprocess_audio(video_path,
     video = VideoFileClip(video_path)
     audio = video.audio
 
+    if audio is None:
+        return 
+
     audio_data = audio.to_soundarray(fps=fps)
     audio_data = np.mean(audio_data, axis=1)
     audio_data = audio_data.reshape(1, -1)
@@ -18,7 +21,11 @@ def load_and_preprocess_audio(video_path,
     return audio_data
 
 
-def get_audio_features(audio_data, model):
+def get_audio_features(model, audio_data=None, video_path=None):
+    if video_path is not None:
+        audio_data = load_and_preprocess_audio(video_path)
+        if audio_data is None:
+            return
 
     with torch.no_grad():
         audio_embed = model.get_audio_embedding_from_data(

@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from src.config import DB_PATH
+from .config import DB_PATH
 
 
 def create_db():
@@ -52,8 +52,11 @@ def get_row_by_uuid(uuid):
 def get_audio_embedding_by_uuid(uuid):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute(
-        'SELECT embedding_audio FROM embeddings WHERE uuid = ?', (uuid,))
-    data = c.fetchall()
+    
+    c.execute('SELECT embedding_audio FROM embeddings WHERE uuid = ?', (uuid,))
+    
+    data = c.fetchone()
+    
     conn.close()
-    return data
+    
+    return data[0] if data is not None else None  
