@@ -1,13 +1,18 @@
 import streamlit as st
-from DB_code import add_embedding_video_test, get_video_embeddings
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from duplicate_video_yappy.parser import download_file
+from src.utils import download_file
 import torch
-from duplicate_video_yappy.models.model import SimilarityRecognizer
-from duplicate_video_yappy.src.video_analysis import get_video_features
-from duplicate_video_yappy.src.preprocess import Preprocess
+import os
+import pickle
 
+from DB_code import add_embeddings, get_all_data, get_row_by_video_id, create_db
+from src.video_analysis import get_video_features
+from src.audio_analysis import get_audio_features, load_and_preprocess_audio
+from src.video_preprocess import load_and_preprocess_video
+from src.utils import get_video_model, get_audio_model, find_most_similar_by_video, compute_similarity
+from src.config import VIDEO_SIMILARITY_THRESHOLD, AUDIO_SIMILARITY_THRESHOLD
+
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Установка стилей
 st.set_page_config(page_title="Сервис распознавания видео", layout="wide")
@@ -32,41 +37,95 @@ st.markdown("""
 
 # Можно использовать @st.cache_data перед load data которая по идеи нужна для загрузки эмбедингов чтобы сравнить
 st.title("Тест сервиса по распознаванию видео", anchor=None)
-st.markdown('<p class="description">Введите ссылку на видео для проверки на дубликат.</p>', unsafe_allow_html=True)
+st.markdown('<p class="description">Введите ссылку на видео для проверки на дубликат.</p>',
+            unsafe_allow_html=True)
 
 video_link = st.text_input("Ссылка на видео:")
 
+@st.cache_resource
+def load_models():
+    video_model = get_video_model(device)
+    audio_model = get_audio_model(device)
+    return video_model, audio_model
+
+video_model, audio_model = load_models()
+
+create_db()
+
 if st.button("Отправить"):
-    video = download_file(video_link)
-    # Извлечение эмбеддинга(надо написать)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    video_model = SimilarityRecognizer(model_type="base", batch_size=8).to(device)
-    video_model.load_pretrained_weights("checkpoints/best_model_base_224_16x16_rgb.pth")
-    video_model.eval()
-    preprocess = Preprocess(clip_len=8, out_size=224, frame_interval=1, channels=1)
-    embedding = get_video_features(preprocess, video_model, video_paths=video)
+    video_id = video_link.split('/')[-1].split('.')[0]
 
-    # Получаем все эмбеддинги из базы данных
-    embeddings_data = get_video_embeddings()
+    video_path = f'temp_downloads/{video_id}.mp4'
 
-    # Добавление эмбеддинга в базу данных
-    add_embedding_video_test(video_link, embedding.tobytes())
+    download_file(video_link, video_path)
+    frames = load_and_preprocess_video(video_path)
 
-    max_similarity = -1
-    most_similar_id = None
-    threshold = 0.8601731272679782
 
-    for id, link, stored_embedding in embeddings_data:
-        stored_embedding = np.frombuffer(stored_embedding, dtype=np.float64).reshape(1, -1)
-        similarity = cosine_similarity(embedding, stored_embedding)[0][0]
-
-        if similarity > max_similarity:
-            max_similarity = similarity
-            most_similar_id = id
-            break
-
-    if max_similarity > threshold:
-        st.markdown(f'<p class="result">Это дубликат видео под ID: {most_similar_id}</p>', unsafe_allow_html=True)
-
+    if frames is not None:
+        query_video_embedding = get_video_features(frames, video_model)
     else:
-        st.markdown('<p class="result">Похожих видео не найдено.</p>', unsafe_allow_html=True)
+        raise ValueError('Не удалось загрузить видео :/')
+
+    data = get_all_data()
+
+    db_embeddings = [
+        (
+            row[1], 
+            pickle.loads(row[2]) if row[2] is not None else None, 
+            pickle.loads(row[3]) if row[3] is not None else None
+        )
+        for row in data 
+    ]
+
+    similar_video_id, video_similarity_rate = find_most_similar_by_video(
+        query_video_embedding, db_embeddings)
+
+    if 0 < video_similarity_rate < VIDEO_SIMILARITY_THRESHOLD:
+        st.markdown('<p class="result">Похожих видео не найдено.</p>',
+                            unsafe_allow_html=True)
+
+        video_embedding_serialized = pickle.dumps(query_video_embedding)
+
+        audio_data = load_and_preprocess_audio(video_path)
+        query_audio_embeddings = get_audio_features(audio_data, audio_model)
+        if query_audio_embeddings is not None:
+            audio_embedding_serialized = pickle.dumps(query_video_embedding)
+            add_embeddings(video_id, video_embedding_serialized, audio_embedding_serialized)
+        else:
+            add_embeddings(video_id, video_embedding_serialized, None)
+
+
+    else:    
+        audio_data = load_and_preprocess_audio(video_path)
+        query_audio_embeddings = get_audio_features(audio_data, audio_model)
+        db_similar_video_data = get_row_by_video_id(similar_video_id)
+        if db_similar_video_data:
+            db_audio_embeddings = get_row_by_video_id(similar_video_id)[0][3]
+            
+            db_audio_embeddings = pickle.loads(db_audio_embeddings) if db_audio_embeddings is not None else None
+
+            if query_audio_embeddings is not None and db_audio_embeddings is not None:
+                audio_similarity = compute_similarity(query_audio_embeddings, db_audio_embeddings)
+
+                if audio_similarity < AUDIO_SIMILARITY_THRESHOLD:
+                    video_embedding_serialized = pickle.dumps(query_video_embedding)
+                    add_embeddings(video_id, video_embedding_serialized, None)
+                else:
+                    st.markdown(f'<p class="result">Это дубликат видео под ID: {similar_video_id},\
+                    коэффициент сходства равен {video_similarity_rate} </p>',
+                                unsafe_allow_html=True)
+                    print(f'Query video is dublicate for video_id = {similar_video_id},\
+                        video_similarity_rate = {video_similarity_rate}')
+        
+            else:
+                st.markdown(f'<p class="result">Это дубликат видео под ID: {similar_video_id},\
+                    коэффициент сходства равен {video_similarity_rate} </p>',
+                                unsafe_allow_html=True)
+                print(f'Query video is dublicate for video_id = {similar_video_id},\
+                        video_similarity_rate = {video_similarity_rate}')
+        else:
+            video_embedding_serialized = pickle.dumps(query_video_embedding)
+            add_embeddings(video_id, video_embedding_serialized, None)
+
+    if os.path.exists(video_path):
+        os.remove(video_path)

@@ -18,8 +18,7 @@ def load_and_preprocess_audio(video_path,
     return audio_data
 
 
-def get_audio_features(model,
-                       audio_data):
+def get_audio_features(audio_data, model):
 
     with torch.no_grad():
         audio_embed = model.get_audio_embedding_from_data(

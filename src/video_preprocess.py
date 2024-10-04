@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import torch
 
 
 def load_video_cv2(video, fps_ratio=1, all_frames=False, channels=3):
@@ -110,3 +111,19 @@ class Preprocess():
             print(f"error: {video_path}")
             raise ValueError
         return frames
+
+
+def load_and_preprocess_video(video_path,
+                              clip_len=8,
+                              frame_interval=1,
+                              channels=1):
+    """Функция, в которой подгружается и обрабатывается видео"""
+
+    preprocess = Preprocess(clip_len=clip_len, out_size=224,
+                            frame_interval=frame_interval, channels=channels)
+
+    frames = torch.from_numpy(preprocess(video_path))
+
+    frames = frames.permute(0, 4, 1, 2, 3).float()
+
+    return frames

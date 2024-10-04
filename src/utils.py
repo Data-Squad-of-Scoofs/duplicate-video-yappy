@@ -2,29 +2,28 @@ import os
 import requests
 import numpy as np
 from tqdm import tqdm
+import laion_clap
+
+from models.model import SimilarityRecognizer
 
 
 def download_file(object_url, download_path):
     directory = os.path.dirname(download_path)
+
     if not os.path.exists(directory):
-        dir_path = os.path.join(os.getcwd(), directory)
-        os.makedirs(dir_path)
+        os.makedirs(directory)
 
     response = requests.get(object_url)
 
     if response.status_code == 200:
         with open(download_path, 'wb') as file:
             file.write(response.content)
-        print("Файл успешно скачан и сохранен в:", download_path)
+        # print("Файл успешно скачан и сохранен в:", download_path)
     else:
         print("Ошибка при скачивании файла:", response.status_code)
 
 
-def mp4(name):
-    return name+'.mp4'
-
-
-def compute_similarities(q_feat, d_feat, topk_cs=True):
+def compute_similarity(q_feat, d_feat, topk_cs=True):
     sim = q_feat @ d_feat.T
     sim = sim.max(dim=1)[0]
     if topk_cs:
@@ -33,37 +32,34 @@ def compute_similarities(q_feat, d_feat, topk_cs=True):
     return sim
 
 
-def calculate_similarities(video_id=None,
-                           second_video_id=None,
-                           all_features=None):
+def get_video_model(device):
+    video_model = SimilarityRecognizer(model_type="base", batch_size=8)
+    video_model.to(device)
+    video_model.load_pretrained_weights(
+        "checkpoints/best_model_base_224_16x16_rgb.pth")
+    video_model.eval()
 
-    if video_id is not None and second_video_id is not None:
-        return compute_similarities(all_features[video_id],
-                                    all_features[second_video_id])
-
-    elif video_id is not None and all_features is not None:
-        first_feat = all_features[video_id]
-        similarities = {}
-        for second_video_id in all_features:
-            if second_video_id != video_id:
-                similarities[second_video_id] = compute_similarities(
-                    first_feat, all_features[second_video_id])
-        return similarities
-
-    elif all_features is not None:
-        similarities = {}
-        for video_id in tqdm(all_features,
-                             desc="Calculating similarities for all videos",
-                             ncols=70):
-            similarities[video_id] = calculate_similarities(
-                video_id, all_features=all_features)
-        return similarities
-
-    return None  # В случае, если не указаны необходимые переменные
+    return video_model
 
 
-def compute_rhythm_similarities(q_feat, d_feat):
-    min_length = min(len(q_feat), len(d_feat))
-    rhythm_similarity = (np.corrcoef(
-        q_feat[:min_length], d_feat[:min_length])[0, 1] + 1) / 2
-    return rhythm_similarity
+def get_audio_model(device):
+    audio_model = laion_clap.CLAP_Module(
+        enable_fusion=False, device=device, amodel='HTSAT-base')
+    audio_model.load_ckpt(
+        'checkpoints/music_speech_audioset_epoch_15_esc_89.98.pt')
+    audio_model.eval()
+
+    return audio_model
+
+
+def find_most_similar_by_video(query_embedding, db_embeddings):
+    max_similarity = float('-inf')
+    max_similar_video_id = None
+    for db_video_id, db_embedding, _ in db_embeddings:
+        similarity = compute_similarity(query_embedding, db_embedding)
+
+        if similarity > max_similarity:
+            max_similarity = similarity
+            max_similar_video_id = db_video_id
+
+    return max_similar_video_id, max_similarity
