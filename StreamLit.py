@@ -4,7 +4,7 @@ import torch
 import os
 import pickle
 
-from DB_code import add_embeddings, get_all_data, get_row_by_video_id, create_db
+from DB_code import add_embeddings, get_all_data, get_row_by_uuid, create_db, get_audio_embedding_by_uuid
 from src.video_analysis import get_video_features
 from src.audio_analysis import get_audio_features, load_and_preprocess_audio
 from src.video_preprocess import load_and_preprocess_video
@@ -70,14 +70,14 @@ if st.button("Отправить"):
 
     db_embeddings = [
         (
-            row[1], 
-            pickle.loads(row[2]) if row[2] is not None else None, 
-            pickle.loads(row[3]) if row[3] is not None else None
+            row[0], 
+            pickle.loads(row[1]) if row[1] is not None else None, 
+            pickle.loads(row[2]) if row[2] is not None else None
         )
         for row in data 
     ]
 
-    similar_video_id, video_similarity_rate = find_most_similar_by_video(
+    similar_uuid, video_similarity_rate = find_most_similar_by_video(
         query_video_embedding, db_embeddings)
 
     if 0 < video_similarity_rate < VIDEO_SIMILARITY_THRESHOLD:
@@ -90,18 +90,18 @@ if st.button("Отправить"):
         query_audio_embeddings = get_audio_features(audio_data, audio_model)
         if query_audio_embeddings is not None:
             audio_embedding_serialized = pickle.dumps(query_video_embedding)
-            add_embeddings(video_id, video_embedding_serialized, audio_embedding_serialized)
+            add_embeddings(video_embedding_serialized, audio_embedding_serialized)
         else:
-            add_embeddings(video_id, video_embedding_serialized, None)
+            add_embeddings(video_embedding_serialized, None)
 
 
     else:    
         audio_data = load_and_preprocess_audio(video_path)
         query_audio_embeddings = get_audio_features(audio_data, audio_model)
-        db_similar_video_data = get_row_by_video_id(similar_video_id)
+        db_similar_video_data = get_row_by_uuid(similar_uuid)
         if db_similar_video_data:
-            db_audio_embeddings = get_row_by_video_id(similar_video_id)[0][3]
-            
+            db_audio_embeddings = get_audio_embedding_by_uuid(similar_uuid)[0]
+
             db_audio_embeddings = pickle.loads(db_audio_embeddings) if db_audio_embeddings is not None else None
 
             if query_audio_embeddings is not None and db_audio_embeddings is not None:
@@ -109,23 +109,23 @@ if st.button("Отправить"):
 
                 if audio_similarity < AUDIO_SIMILARITY_THRESHOLD:
                     video_embedding_serialized = pickle.dumps(query_video_embedding)
-                    add_embeddings(video_id, video_embedding_serialized, None)
+                    add_embeddings(video_embedding_serialized, None)
                 else:
-                    st.markdown(f'<p class="result">Это дубликат видео под ID: {similar_video_id},\
+                    st.markdown(f'<p class="result">Это дубликат видео под ID: {similar_uuid},\
                     коэффициент сходства равен {video_similarity_rate} </p>',
                                 unsafe_allow_html=True)
-                    print(f'Query video is dublicate for video_id = {similar_video_id},\
+                    print(f'Query video is dublicate for uuid = {similar_uuid},\
                         video_similarity_rate = {video_similarity_rate}')
         
             else:
-                st.markdown(f'<p class="result">Это дубликат видео под ID: {similar_video_id},\
+                st.markdown(f'<p class="result">Это дубликат видео под ID: {similar_uuid},\
                     коэффициент сходства равен {video_similarity_rate} </p>',
                                 unsafe_allow_html=True)
-                print(f'Query video is dublicate for video_id = {similar_video_id},\
+                print(f'Query video is dublicate for uuid = {similar_uuid},\
                         video_similarity_rate = {video_similarity_rate}')
         else:
             video_embedding_serialized = pickle.dumps(query_video_embedding)
-            add_embeddings(video_id, video_embedding_serialized, None)
+            add_embeddings(video_embedding_serialized, None)
 
     if os.path.exists(video_path):
         os.remove(video_path)

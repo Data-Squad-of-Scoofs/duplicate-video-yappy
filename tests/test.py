@@ -22,8 +22,5 @@ def test_audio():
 def test_cuda():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    # Проверка, что устройство — это cuda в случае наличия поддерживаемого устройства
-    if torch.cuda.is_available():
-        assert device == 'cuda', "Device should be cuda if available."
-    else:
-        assert device == 'cpu', "Device should be cpu if cuda is not available."
+    assert device == 'cuda', "Device should be cuda ."
+

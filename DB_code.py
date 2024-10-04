@@ -13,7 +13,6 @@ def create_db():
     c.execute('''
             CREATE TABLE IF NOT EXISTS embeddings(
                uuid INTEGER PRIMARY KEY AUTOINCREMENT,
-               video_id TEXT,
                embedding_video BLOB,
                embedding_audio BLOB
             )
@@ -23,11 +22,11 @@ def create_db():
     conn.close()
 
 
-def add_embeddings(video_id, embedding_video, embedding_audio):
+def add_embeddings(embedding_video, embedding_audio):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('INSERT INTO embeddings (video_id, embedding_video, embedding_audio) VALUES (?, ?, ?)',
-              (video_id, embedding_video, embedding_audio))
+    c.execute('INSERT INTO embeddings (embedding_video, embedding_audio) VALUES (?, ?)',
+              (embedding_video, embedding_audio))
     conn.commit()
     conn.close()
 
@@ -36,17 +35,25 @@ def get_all_data():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        'SELECT uuid, video_id, embedding_video, embedding_audio FROM embeddings')
+        'SELECT uuid, embedding_video, embedding_audio FROM embeddings')
     data = c.fetchall()
     conn.close()
     return data
 
-def get_row_by_video_id(video_id):
+def get_row_by_uuid(uuid):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        'SELECT uuid, video_id, embedding_video, embedding_audio FROM embeddings WHERE video_id = ?', (video_id,))
+        'SELECT uuid, embedding_video, embedding_audio FROM embeddings WHERE uuid = ?', (uuid,))
     data = c.fetchall()
     conn.close()
     return data
 
+def get_audio_embedding_by_uuid(uuid):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        'SELECT embedding_audio FROM embeddings WHERE uuid = ?', (uuid,))
+    data = c.fetchall()
+    conn.close()
+    return data
